@@ -10,6 +10,7 @@ from typing import Any, Dict, Literal, Mapping, Optional
 from data_provider.base import normalize_stock_code
 
 from src.analyzer import AnalysisResult
+from src.services.v3_signal_pipeline import apply_v3_enhancement
 from src.core.trading_calendar import get_market_for_stock
 from src.schemas.decision_action import build_action_fields, normalize_decision_action
 from src.schemas.decision_scale import (
@@ -169,6 +170,8 @@ def build_decision_signal_payload_from_report(
         "metadata": metadata,
         "report_language": getattr(result, "report_language", None),
     }
+    # ── V3.0 规则增强 ──
+    payload = apply_v3_enhancement(payload, result, daily_bars=None)
     return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
 
 
