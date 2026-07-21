@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Valid orchestrator modes (ordered by cost/depth)
-VALID_MODES = ("quick", "standard", "full", "specialist")
+VALID_MODES = ("quick", "standard", "full", "specialist", "debate")
 
 
 @dataclass
@@ -99,6 +99,7 @@ class AgentOrchestrator:
         self.max_steps = max_steps
         normalized_mode = "specialist" if mode in {"strategy", "skill"} else mode
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
+        self._debate_inserted = False
         self.skill_manager = skill_manager
         self.config = config
 
@@ -467,6 +468,21 @@ class AgentOrchestrator:
                 if specialist_agents:
                     agents[index:index] = specialist_agents
                     continue
+            # ── Bull/Bear debate stage ──
+            if (
+                self.mode in ("specialist", "full", "debate")
+                and agent.agent_name == "decision"
+                and not self._debate_inserted
+            ):
+                try:
+                    debate_agent = DebateAgent(llm_adapter=self.llm_adapter)
+                    debate_result = debate_agent.run(ctx)
+                    if debate_result.status.value == "completed":
+                        ctx.add_stage_result(debate_result)
+                        logger.info("[BullBear] debate completed for %s", ctx.stock_code)
+                except Exception as exc:
+                    logger.warning("[BullBear] debate skipped: %s", exc)
+                self._debate_inserted = True
 
             # Aggregate skill opinions before the decision agent
             if agent.agent_name == "decision" and getattr(self, "_skill_agent_names", None):
